@@ -3,6 +3,7 @@
   <head>
     <title>One English Word</title>
     <link href='https://fonts.googleapis.com/css?family=Raleway:100' rel='stylesheet' type='text/css'>
+    <script src="https://code.jquery.com/jquery-2.2.1.min.js"></script>
 
     <style type="text/css">
       @keyframes fadeIn {
@@ -50,20 +51,44 @@
       }
 
       #definition {
-        margin: 100px 0 0 0;
-        font-size: 5vw;
+        margin: 50px 0 0;
+        font-size: 4vw;
+      }
+
+      @media only screen and (max-width: 767px) {
+        #word {
+          margin: 10px 0 0 0;
+          font-size: 18vw;
+        }
+
+        #type {
+          margin: 10px 0 0;
+          font-size: 8vw;
+          font-style: italic;
+        }
+
+        #definition {
+          margin: 20px 0 0;
+          font-size: 12vw;
+        }
       }
     </style>
 
     <script type="text/javascript">
       var main = function() {
-        var COLORS = ['#2980b9', '#27ae60']
+        // Array of Hex Colors to change background between
+        var COLORS = [
+          '#1abc9c', '#16a085', '#f39c12', '#2ecc71', '#27ae60', '#e67e22', '#d35400', '#3498db',
+          '#2980b9', '#e74c3c', '#c0392b', '#9b59b6', '#8e44ad', '#34495e', '#2c3e50'
+        ]
         var body = document.getElementById("body");
         var word_div = document.getElementById("word");
         var type_div = document.getElementById("type");
         var definition_div = document.getElementById("definition");
+        window.started = false;
 
-        var presentWord = function(word_obj) {
+        // Fades out old word and fades in new word and updates page text
+        window.presentWord = function(word_obj) {
           fadeOut(word_div);
           fadeOut(type_div);
           fadeOut(definition_div);
@@ -81,38 +106,90 @@
           }, 1000)
         }
 
-        var fadeOut = function(html_element) {
+        // Helper function to fade out an html element
+        window.fadeOut = function(html_element) {
           html_element.classList.remove("fade-in");
           html_element.classList.add("fade-out");
         }
 
-        var fadeIn = function(html_element) {
+        // Helper function to fade in an html element
+        window.fadeIn = function(html_element) {
           html_element.classList.remove("fade-out");
           html_element.classList.add("fade-in");
         }
 
-        var randomColor = function() {
+        // Returns a random hex color from COLORS array
+        window.randomColor = function() {
           var index = (Math.random() * (COLORS.length - 1)).toFixed()
           return COLORS[index];
         }
 
-        var test_word = {
-          word: 'heterogenous',
-          type: 'adjective',
-          definition: 'diverse in character or content'
+        // Dictionary API Class
+        window.Dictionary = {
+          BASE_API: 'http://api.wordnik.com:80/v4',
+          API_KEY: 'a2a73e7b926c924fad7001ca3111acd55af2ffabf50eb4ae5'
         }
 
-        var test_word_2 = {
-          word: 'other',
-          type: 'noun',
-          definition: 'other definition'
+        // Refreshes global list of words to show
+        Dictionary.refreshRandomWords = function() {
+          url =
+            this.BASE_API +
+            '/words.json/randomWords?hasDictionaryDef=true&minDictionaryCount=30&api_key=' +
+            this.API_KEY
+
+          $.ajax(
+            url,
+            {
+              success: function(response) {
+                window.words = [];
+                for(var i = 0; i < response.length; i += 1) {
+                  window.words.push(response[i].word);
+                }
+
+                if(window.started == false) {
+                  Dictionary.getDefinition(window.words.shift());
+                  window.started = true;
+                }
+              }
+            }
+          )
         }
 
-        presentWord(test_word);
+        // Fetches definition of given word and presents it on finishing the request
+        Dictionary.getDefinition = function(word) {
+          url = this.BASE_API + '/word.json/' + word +
+                '/definitions?use_canonical=true&api_key=' + this.API_KEY
 
-        setTimeout(function() {
-          presentWord(test_word_2);
-        }, 5000)
+          $.ajax(
+            url,
+            {
+              success: function(response) {
+                word_obj = response[0]
+                window.presentWord({
+                  word: word,
+                  type: word_obj.partOfSpeech,
+                  definition: word_obj.text
+                })
+              }
+            }
+          )
+        }
+
+        // Main loop that fetches next word, and gets the definition
+        window.loop = function() {
+          setInterval(function() {
+            if(window.words == undefined || window.words.length <= 0) {
+              Dictionary.refreshRandomWords()
+            }
+            else {
+              var currentWord = window.words.shift();
+              Dictionary.getDefinition(currentWord);
+            }
+          }, 8000)
+        }
+
+        Dictionary.refreshRandomWords()
+        loop();
       }
 
       window.onload = main;
